@@ -1,0 +1,172 @@
+# τ₀-VLA: a Hierarchical Robot Foundation Model with World-Model-Guided Test-Time Computation
+
+<div id="top" align="center">
+
+![τ₀-VLA overview](assets/overview.png)
+
+<a href="https://tau0-vla.github.io/"><img src="https://img.shields.io/badge/Project_Website-tau0_VLA-blue" height="25" alt="Project Website"></a> &nbsp; <a href="https://arxiv.org/abs/2608.16885"><img src="https://img.shields.io/badge/Paper-tau0_VLA-red" height="25" alt="Paper"></a> &nbsp; <a href="https://huggingface.co/sii-research/tau-0-vla"><img src="https://img.shields.io/badge/Weight-Hugging_Face-orange" height="25" alt="Model Weights"></a>
+
+</div>
+
+This repo is the official implementation of **τ₀-VLA: a Hierarchical Robot
+Foundation Model with World-Model-Guided Test-Time Computation**.
+
+## News
+
+- **[2026.09.21]** We release the **high-level proposal and world model**, with
+  weights, inference and fine-tuning code. See the [high-level guide](high_level/README.md)
+  for setup and usage.
+
+- **[2026.09.20]** We release **LIBERO post-training and simulation evaluation**.
+  See the [LIBERO guide](configs/libero/README.md) for checkpoints, setup,
+  and evaluation results.
+
+- **[2026.08.19]** 📢 We plan to progressively release components of the
+  high-level policy. Please stay tuned for updates.
+
+- **[2026.07.27]** 🚀 We release the **τ₀-VLA** model
+  [Paper](https://arxiv.org/abs/2608.16885),
+  [Project Website](https://tau0-vla.github.io/), and
+  [Hugging Face](https://huggingface.co/sii-research/tau-0-vla).
+
+## Overview
+
+τ₀-VLA is a hierarchical robot foundation model for long-horizon
+manipulation. A memory-augmented high-level policy generates the next subtask
+and uses world-model-guided test-time computation to search over alternatives
+when additional reasoning is needed. A generalist low-level policy then
+executes the selected subtask across robot embodiments.
+
+The low-level policy combines a Qwen3.5 vision-language backbone with a
+Mixture-of-Transformers action expert trained through conditional flow
+matching. It uses a unified 40-dimensional state/action space and was trained
+on 40,115 hours of heterogeneous real-world robot data with multimodal
+co-training.
+
+![Hierarchical τ₀-VLA pipeline](assets/method.png)
+
+## Model checkpoints
+
+| Model | Description |
+| --- | --- |
+| [τ₀-VLA](https://huggingface.co/sii-research/tau-0-vla) | Pretrained low-level policy for robot post-training |
+| [τ₀-VLA LIBERO](https://huggingface.co/sii-research/tau-0-vla-libero) | LIBERO checkpoint for simulation evaluation |
+| [τ₀-VLA Proposal](https://huggingface.co/sii-research/tau-0-vla-proposal) | High-level planner with task memory and three-camera input |
+| [τ₀-VLA World Model](https://huggingface.co/sii-research/tau-0-vla-world-model) | Robotics LoRA for goal-image generation |
+
+## Installation
+
+The reference environment uses Python 3.11, CUDA 12.8, and PyTorch 2.7.1.
+
+```bash
+git clone git@github.com:sii-research/tau-0-vla.git
+cd tau-0-vla
+bash scripts/setup.sh
+```
+
+## High-level components
+
+[Proposal](high_level/proposal/README.md) predicts the next subtask and updates
+memory from three camera views. [World model](high_level/world_model/README.md)
+generates a goal image from the current observation and a subtask. Both include
+inference and fine-tuning examples; use their separate environments.
+
+See the [high-level quickstart](high_level/README.md) and
+[example predictions](high_level/examples/README.md).
+
+## Example data and post-training
+
+[`example_data/`](example_data/README.md) contains a small AgiBot World subset
+in LeRobot v3.0 format. The matching post-training recipe is under
+[`configs/example_agibot_world_gong/`](configs/example_agibot_world_gong/README.md).
+
+```bash
+bash scripts/train.sh configs/example_agibot_world_gong/train.yaml \
+    --model_name_or_path /path/to/tau-0-vla-checkpoint
+```
+
+For another dataset or robot, start from
+[`configs/_template/`](configs/_template/README.md) and
+[`src/tau0_vla/adapters/_template/`](src/tau0_vla/adapters/_template/README.md).
+The repository also includes a complete LIBERO simulation recipe under
+[`configs/libero/`](configs/libero/README.md).
+
+## Serving and evaluation
+
+Hardware serving uses joint-control checkpoints. LIBERO simulation uses a
+dedicated end-effector (EEF) policy server.
+
+Serve a post-trained joint-control checkpoint:
+
+```bash
+python -m deploy.server --model outputs/<run_name>
+```
+
+Run open-loop evaluation:
+
+```bash
+python deploy/openloop.py --ckpt outputs/<run_name> --no-plot
+```
+
+### LIBERO simulation evaluation
+
+The LIBERO checkpoint fine-tunes the pretrained low-level policy for
+end-effector control across Spatial, Goal, Object, and Long tasks.
+
+See the [LIBERO guide](configs/libero/README.md) for checkpoint downloads,
+model and simulator environments, evaluation commands, and benchmark results.
+
+See [`deploy/`](deploy/README.md) for the payload and action-order contracts.
+
+## Repository layout
+
+```text
+src/tau0_vla/
+├── adapters/    embodiment-specific data layouts and deployment I/O
+├── data/        LeRobot loading, prompting, masking, and normalization
+├── high_level/  proposal inference, serving, and fine-tuning
+├── models/      Qwen3.5 backbone and flow-matching action expert
+├── trainer/     post-training entry point
+├── vlm/         multimodal collation and tokenization
+└── utils/       logging and run specifications
+configs/         reusable template, AgiBot World example, and LIBERO recipe
+deploy/          policy server and open-loop evaluation
+example_data/    bundled AgiBot World subset
+high_level/      component guides, high-level examples, and world-model package
+scripts/         setup, training, and normalization utilities
+```
+
+Additional documentation:
+
+- [Dataset format](src/tau0_vla/data/DATASET_FORMAT.md)
+- [Data pipeline](src/tau0_vla/data/README.md)
+- [Robot adapters](src/tau0_vla/adapters/README.md)
+
+## Citation
+
+If you find our work useful, please cite our [paper](https://arxiv.org/abs/2608.16885):
+
+```bibtex
+@misc{cai2026tau0vlahierarchicalrobotfoundation,
+  title={$\tau_0$-VLA: a Hierarchical Robot Foundation Model with World-Model-Guided Test-Time Computation},
+  author={Xiaowei Cai and Yunuo Cai and Bingao Chen and Jingxiao Chen and Zhi Chen
+          and Siyuan Feng and Tengyu Hou and Jingshun Huang and Han Jiang and Runkun Ju
+          and Dong Li and Mingxiang Li and Shaowei Li and Xinchen Li and Yifan Li
+          and Yi Liu and Zhongyuan Liu and Jianlan Luo and Junwen Miao and Ruiqi Ni
+          and Buqing Nie and Mingjie Pan and Xinlin Ren and Jianheng Song and Jiaxu Wang
+          and Peiqi Wang and Sen Wang and Xiaoyan Wang and Dafeng Wei and Dongming Wu
+          and Pengwei Xie and Pu Yang and Hangjian Ye and Xiangyu Yue and Jinyu Zhang
+          and Qinglin Zhang and Xueyong Zhao and Pengfei Zhou and Yue Zhou},
+  year={2026},
+  eprint={2608.16885},
+  archivePrefix={arXiv},
+  primaryClass={cs.RO},
+  url={https://arxiv.org/abs/2608.16885},
+}
+```
+
+## License
+
+Code and model weights are released under the [Apache License 2.0](LICENSE).
+The bundled example data follows the license described in
+[`example_data/README.md`](example_data/README.md).
